@@ -1,0 +1,376 @@
+Simple Queries (2-3 Table Joins)
+
+1.​ Show all posts with their author's username
+○​ Display: post_id, content, username
+
+SELECT posts.post_id, posts.content, users.username from posts
+JOIN users ON posts.user_id = users.user_id
+
+2.​ Find all comments with post content and commenter's username
+○​ Display: comment_text, post_content, commenter_username
+
+SELECT comments.comment_id, comments.comment_text, posts.content as post_content,
+users.username as commenter_username
+from comments
+JOIN posts ON comments.post_id = posts.post_id
+JOIN users ON comments.user_id = users.user_id
+
+3.​ List users and the number of posts they've made
+○​ Include users with 0 posts
+○​ Display: username, post_count
+
+created new user with zero posts
+INSERT INTO users (user_id, username, email, country, join_date )
+VALUES (11, 'AQIB', 'AQIB@gmail.com', 'PAK', '2023-01-01' )
+RETURNING *
+
+SELECT users.username as Username, COUNT(posts.post_id) as Post_count 
+FROM users 
+LEFT JOIN posts on users.user_id = posts.user_id
+GROUP BY Username
+ORDER BY Post_count
+
+
+4.​ Show posts with their like count and author's country
+○​ Display: content, like_count, country
+
+SELECT posts.content as content, posts.like_count as Like_count, users.country as Country
+FROM posts
+JOIN users ON posts.user_id = users.user_id
+
+5.​ Find all followers with their follow dates and usernames
+○​ Display: follower_username, following_username, follow_date
+
+SELECT users.username as Username,follows.follower_id, follows.followed_id,
+follows.follow_date as follow_date
+FROM follows
+left join users name on follows.follower_id = users.user_id
+GROUP BY Username,
+left join users name on follows.followed_id = users.user_id
+GROUP BY Username
+
+SELECT follows.follower_id, follows.followed_id,
+follows.follow_date as follow_date, users.username
+FROM follows
+JOIN users ON follows.follower_id = users.user_id
+
+SELECT 
+follows.follower_id, follows.followed_id,
+users.username as follower_username,
+users.username as followed_username,
+follows.follow_date as follow_date
+FROM follows
+JOIN users ON follows.follower_id = users.user_id
+JOIN users ON follows.followed_id = users.user_id
+
+the correct one is 
+SELECT 
+follower_user.username AS follower_username,
+followed_user.username AS followed_username,
+follows.follow_date as follow_date
+FROM follows
+JOIN users AS follower_user ON follows.follower_id = follower_user.user_id
+JOIN users AS followed_user ON follows.followed_id = followed_user.user_id
+
+6.​ List posts with comment count
+○​ Display: post_content, comment_count
+
+SELECT posts.content as post_content, 
+COUNT(comments.post_id) as comment_count
+FROM posts 
+JOIN comments ON posts.post_id = comments.post_id
+GROUP BY post_content
+
+7.​ Show users who never made any posts
+○​ Display: username, join_date
+
+MINE
+SELECT users.username as username, COUNT(posts.post_id) as Post_count 
+from users WHERE Post_count = 0
+JOIN posts ON posts.user_id = users.user_id
+
+CORRECTED
+SELECT users.username as username, COUNT(posts.post_id) as Post_count 
+from users 
+LEFT JOIN posts ON posts.user_id = users.user_id
+GROUP BY username
+HAVING COUNT(posts.post_id)=0;
+
+8.​ Find posts with no comments
+○​ Display: post_content, created_at
+
+FIRST create a post with no comments 
+INSERT INTO posts (post_id, user_id, content, created_at, like_count) 
+VALUES (151, 11, 'Post 1 by user 11', '2023-05-01', 10)
+
+NOW
+SELECT posts.content as post_content, posts.created_at
+from posts 
+LEFT JOIN comments ON posts.post_id = comments.post_id
+GROUP BY post_content , posts.created_at
+HAVING COUNT(comments.post_id)=0;
+
+9.​ List users and their last post date
+○​ Display: username, last_post_date
+
+SELECT users.username as username, posts.created_at as last_post_date
+from posts 
+LEFT JOIN users ON posts.user_id = users.user_id
+GROUP BY username, last_post_date
+
+10.​Show mutual follows (users who follow each other)
+○​ Display: user1, user2
+
+SELECT 
+follower_user.username AS user1,
+followed_user.username AS user2
+FROM follows
+JOIN users AS follower_user ON follows.follower_id = follower_user.user_id
+JOIN users AS followed_user ON follows.followed_id = followed_user.user_id
+
+11.​Find the most active commenters (users with most comments)
+○​ Display: username, comment_count
+
+SELECT users.username AS username, COUNT(comments.comment_id) as comment_count
+FROM users 
+LEFT JOIN comments ON comments.user_id = users.user_id
+GROUP BY username
+HAVING COUNT(comments.comment_id) > 15
+
+DECLARE MaxCount INTEGER; 
+SELECT users.username AS username, COUNT(comments.comment_id) as comment_count,
+MaxCount = MAX(comments.comment_id)
+FROM users 
+LEFT JOIN comments ON comments.user_id = users.user_id
+GROUP BY username
+HAVING COUNT(comments.comment_id) > MaxCount
+
+
+SELECT users.username AS username,
+COUNT(comments.comment_id) AS comment_count
+FROM users
+LEFT JOIN comments ON comments.user_id = users.user_id
+GROUP BY users.username
+HAVING COUNT(comments.comment_id) > (SELECT MAX(comment_id) FROM comments);
+
+
+SELECT users.username AS username, COUNT(comments.comment_id) AS comment_count
+FROM users
+LEFT JOIN comments ON comments.user_id = users.user_id
+GROUP BY users.username
+ORDER BY comment_count DESC 
+LIMIT 1; 
+
+12.​List posts created in last 7 days with author info
+○​ Display: username, content, created_at
+
+Updated the posts created at dates 
+UPDATE posts
+SET created_at = CURRENT_DATE - INTERVAL '7 days' + (created_at::date - '2023-05-01'::date) * INTERVAL '1 day';
+
+SELECT users.username AS username, posts.content AS content,
+posts.created_at as created_at
+FROM users
+LEFT JOIN posts ON posts.user_id = users.user_id
+GROUP BY users.username, content, created_at;
+
+SELECT users.username AS username, posts.content AS content,
+posts.created_at AS created_at 
+FROM users
+LEFT JOIN posts ON posts.user_id = users.user_id
+WHERE posts.created_at >= (CURRENT_DATE - INTERVAL '7 days')
+AND posts.created_at <= CURRENT_DATE
+GROUP BY users.username, posts.content, posts.created_at
+
+13.​Show users from same country who follow each other
+○​ Display: user1, user2, country
+
+SELECT 
+follower_user.username AS user1,
+followed_user.username AS user2,
+users.country as country
+FROM follows
+JOIN users AS follower_user ON follows.follower_id = follower_user.user_id
+JOIN users AS followed_user ON follows.followed_id = followed_user.user_id
+WHERE follower_user.country = followed_user.country
+
+SELECT follower_user.username AS user1, followed_user.username AS user2,
+follower_user.country AS country 
+FROM follows
+JOIN users AS follower_user ON follows.follower_id = follower_user.user_id
+JOIN users AS followed_user ON follows.followed_id = followed_user.user_id
+WHERE follower_user.country = followed_user.country;
+
+
+
+14.​Find posts with above average likes
+○​ Display: username, content, like_count
+
+mine
+SELECT users.username AS username, posts.content AS content,
+posts.like_count AS like_count, AVG(posts.like_count) as average
+FROM users
+JOIN posts ON posts.user_id = users.user_id
+WHERE posts.like_count > average
+
+corrected 
+SELECT
+    users.username AS username,
+    posts.content AS content,
+    posts.like_count AS like_count
+FROM users
+JOIN posts ON posts.user_id = users.user_id
+WHERE posts.like_count > (SELECT AVG(like_count) FROM posts);
+
+
+15.​List all comments on posts with less than 10 likes
+○​ Display: commenter_username, comment_text, post_likes
+
+SELECT users.username AS commenter_username, 
+comments.comment_text as comment_text,
+posts.like_count AS like_count
+FROM comments 
+JOIN users ON comments.user_id = users.user_id
+JOIN posts ON comments.post_id = posts.post_id
+WHERE posts.like_count < 10 ;
+
+Intermediate Queries
+16.​Find users who posted and commented on the same day
+○​ Display: username, post_content, comment_text, date
+
+since All posts: May 1-5, 2023 and All comments: May 6, 2023
+Result was 0 rows because no posts and comments share the same date so
+Added comments with same dates as posts
+INSERT INTO comments (comment_id, post_id, user_id, comment_text, created_at) VALUES
+(151, 1, 2, 'Commented on the same day!', '2023-05-01'),
+(152, 6, 3, 'Same day comment!', '2023-05-01'),
+(153, 11, 4, 'Posted and commented today!', '2023-05-01'),
+(154, 16, 5, 'Great post on the same day!', '2023-05-01'),
+(155, 21, 6, 'Same day engagement!', '2023-05-01'),
+
+(156, 2, 3, 'Commenting on posting day!', '2023-05-02'),
+(157, 7, 4, 'Same day as post!', '2023-05-02'),
+(158, 12, 5, 'Active on the same day!', '2023-05-02'),
+(159, 17, 6, 'Posted and commented!', '2023-05-02'),
+(160, 22, 7, 'Same date activity!', '2023-05-02'),
+
+(161, 3, 4, 'Commenting today!', '2023-05-03'),
+(162, 8, 5, 'Same day interaction!', '2023-05-03'),
+(163, 13, 6, 'Active today!', '2023-05-03'),
+(164, 18, 7, 'Posted and commented same day!', '2023-05-03'),
+(165, 23, 8, 'Same date!', '2023-05-03'),
+
+(166, 4, 5, 'Comment on post day!', '2023-05-04'),
+(167, 9, 6, 'Same day!', '2023-05-04'),
+(168, 14, 7, 'Active on May 4th!', '2023-05-04'),
+(169, 19, 8, 'Posted and commented!', '2023-05-04'),
+(170, 24, 9, 'Same date engagement!', '2023-05-04'),
+
+(171, 5, 6, 'Final same day comment!', '2023-05-05'),
+(172, 10, 7, 'Commenting on post day!', '2023-05-05'),
+(173, 15, 8, 'Same day activity!', '2023-05-05'),
+(174, 20, 9, 'Posted and commented today!', '2023-05-05'),
+(175, 25, 10, 'Last same day comment!', '2023-05-05');
+
+and Update all comments to have dates within the post date range
+UPDATE comments 
+SET created_at = posts.created_at + INTERVAL '1 hour'
+FROM posts 
+WHERE comments.post_id = posts.post_id;
+
+mine
+SELECT users.username as username, posts.content as post_content, comments.comment_text,
+ comments.created_at as date
+from comments 
+join users on comments.user_id = users.user_id
+join posts on comments.post_id = posts.post_id
+WHERE posts.created_at = comments.created_at
+
+helped
+SELECT users.username as username, posts.content as post_content, comments.comment_text,
+DATE(comments.created_at) as date
+from comments 
+join users on comments.user_id = users.user_id
+join posts on comments.post_id = posts.post_id
+WHERE DATE(posts.created_at) = DATE(comments.created_at)
+
+Adding the DATE() function helped because timestamps include both date AND time components, while you only wanted to compare the date parts.
+
+
+17.​Show the user with most posts in each country
+○​ Display: country, username, post_count
+
+SELECT DISTINCT ON (users.country) users.country as country, users.username as username, 
+COUNT(posts.post_id) as post_count
+from users 
+join posts on users.user_id = posts.user_id
+GROUP BY country, username
+
+
+18.​List users who never commented on their own posts
+○​ Display: username, post_count
+
+mine
+SELECT users.username as username,
+COUNT(posts.post_id) as post_count
+from users 
+join posts on users.user_id = posts.user_id
+join comments on comments.post_id = posts.post_id
+where users.user_id != comments.user_id
+group by username
+
+corrected
+SELECT users.username as username,
+COUNT(posts.post_id) as post_count
+from users 
+join posts on users.user_id = posts.user_id
+LEFT JOIN comments ON comments.post_id = posts.post_id 
+AND comments.user_id = users.user_id
+WHERE comments.comment_id IS NULL
+group by username
+
+19.​Find the most popular post for each user
+○​ Display: username, post_content, max_likes
+
+mine
+SELECT DISTINCT ON (users.user_id) users.username as username, 
+posts.content as post_content, MAX(posts.like_count) as max_likes
+from users 
+join posts on users.user_id = posts.user_id
+group by username,post_content, users.user_id
+
+improved
+SELECT DISTINCT ON (users.user_id) users.username as username, 
+posts.content as post_content, posts.like_count as max_likes
+from users 
+join posts on users.user_id = posts.user_id
+order by users.user_id, max_likes desc
+
+20.​Show users who follow more people than follow them
+○​ Display: username, following_count, follower_count
+
+since all users data was 4 4 i made last user aqib follow 4 people 
+INSERT INTO follows (follower_id, followed_id, follow_date) VALUES
+(11, 1, '2023-04-01'), 
+(11, 2, '2023-04-02'),  
+(11, 3, '2023-04-03'),
+(11, 4, '2023-04-04')
+returning*
+
+mine
+SELECT users.username, COUNT(follows.followed_id) following_count, 
+COUNT(follows.follower_id) as follower_count
+FROM follows
+JOIN users ON follows.follower_id = users.user_id
+group by users.username
+
+corrected
+SELECT 
+    users.username,
+    COUNT(DISTINCT following.followed_id) as following_count,
+    COUNT(DISTINCT follower.follower_id) as follower_count
+FROM users
+LEFT JOIN follows following ON users.user_id = following.follower_id
+LEFT JOIN follows follower ON users.user_id = follower.followed_id
+GROUP BY users.user_id, users.username
+HAVING COUNT(DISTINCT following.followed_id) > COUNT(DISTINCT follower.follower_id);

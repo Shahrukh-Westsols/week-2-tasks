@@ -1,0 +1,117 @@
+Complex Queries
+
+21.​Find users with consistently increasing like counts on their posts
+○​ Users whose each post has more likes than the previous one
+
+first added a new user 
+INSERT INTO users (user_id, username, email, country, join_date) VALUES
+(12, 'shery', 'shery@gmail.com', 'PAK', '2023-04-01')
+RETURNING *;
+
+then his posts with increasing likes
+INSERT INTO posts (post_id, user_id, content, created_at, like_count) VALUES
+(52, 12, 'Post 1 by AQIB', '2023-05-01', 1),
+(53, 12, 'Post 2 by AQIB', '2023-05-02', 3),
+(54, 12, 'Post 3 by AQIB', '2023-05-03', 5),
+(55, 12, 'Post 4 by AQIB', '2023-05-04', 7),
+(56, 12, 'Post 5 by AQIB', '2023-05-05', 9)
+RETURNING *;
+
+SELECT users.username, posts.content as post, posts.created_at,
+posts.like_count as likes
+FROM users
+join posts on posts.user_id = users.user_id
+where posts.like_count > 0 
+order by users.user_id, likes asc
+
+mine understood window functions lag and lead
+SELECT users.username, posts.content as post, posts.created_at,
+posts.like_count as likes, 
+lag(p.like_count) over (ORDER BY p.created_at) as previous_like,
+lead(p.like_count) over (ORDER BY p.created_at) as next_like
+FROM users
+join posts on posts.user_id = users.user_id
+join posts as p on posts.user_id = users.user_id
+where previous_like < next_like
+order by users.user_id, posts.created_at asc
+
+understood Common Table Expression (CTE) allows you to calculate the window functions first, and then reference those results in an outer query's WHERE clause.so updated code as 
+
+WITH PostLikes AS (
+SELECT users.username, posts.content AS post,
+posts.created_at, posts.like_count AS likes,
+LAG(posts.like_count) OVER (PARTITION BY users.user_id ORDER BY posts.created_at) AS previous_like,
+LEAD(posts.like_count) OVER (PARTITION BY users.user_id ORDER BY posts.created_at) AS next_like
+FROM users
+JOIN posts ON posts.user_id = users.user_id
+)
+
+SELECT username, post, created_at, likes, previous_like, next_like
+FROM PostLikes
+where previous_like < next_like
+order by username, created_at asc
+
+
+22.​Identify "influencer" chains (A follows B follows C follows A)
+○​ Display all 3-user circular follow relationships
+
+WITH follower_user AS (
+SELECT follower_user.username AS user1, followed_user.username AS user2
+FROM follows
+JOIN users AS follower_user ON follows.follower_id = follower_user.user_id
+JOIN users AS followed_user ON follows.followed_id = followed_user.user_id
+order by user1 asc
+)
+
+SELECT user1, user2, u1.username as user3, u2.username as user4
+from follower_user
+join users as u1 on follower_user.user1 = u1.username
+join users as u2 on follower_user.user2 = u2.username
+
+or 
+
+SELECT 
+    u1.username as user_a,
+    u2.username as user_b, 
+    u3.username as user_c
+FROM follows f1
+JOIN follows f2 ON f1.followed_id = f2.follower_id
+JOIN follows f3 ON f2.followed_id = f3.follower_id
+JOIN users u1 ON f1.follower_id = u1.user_id
+JOIN users u2 ON f1.followed_id = u2.user_id
+JOIN users u3 ON f2.followed_id = u3.user_id
+WHERE f3.followed_id = f1.follower_id
+  AND f1.follower_id != f1.followed_id 
+  AND f2.follower_id != f2.followed_id
+  AND f3.follower_id != f3.followed_id
+  AND u1.username != u2.username
+  AND u2.username != u3.username
+  AND u1.username != u3.username;
+  
+correct one 
+SELECT 
+    u1.username as user_a,
+    u2.username as user_b, 
+    u3.username as user_c,
+    u1.username as user_d
+FROM follows f1
+JOIN follows f2 ON f1.followed_id = f2.follower_id
+JOIN follows f3 ON f2.followed_id = f3.follower_id
+JOIN users u1 ON f1.follower_id = u1.user_id
+JOIN users u2 ON f1.followed_id = u2.user_id
+JOIN users u3 ON f2.followed_id = u3.user_id
+WHERE f3.followed_id = f1.follower_id
+  AND f1.follower_id != f1.followed_id
+  AND f2.follower_id != f2.followed_id
+  AND f3.follower_id != f3.followed_id;
+
+
+23.​Find users who commented on every post of a specific user
+24.​Calculate weekly posting growth rate for each user
+○​ Show users with >50% week-over-week growth
+25.​Find the longest sequence of consecutive daily posters
+26.​Identify users with above-average posts and above-average comments
+27.​Find "engagement groups" - users who only comment within their follower group
+28.​Calculate user retention rate (users who posted in consecutive months)29.​Find the most controversial posts (high comments but low likes)
+30.​Identify potential bot activity - users with identical comments across multiple
+posts
